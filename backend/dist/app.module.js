@@ -24,17 +24,38 @@ exports.AppModule = AppModule = __decorate([
             typeorm_1.TypeOrmModule.forRootAsync({
                 imports: [config_1.ConfigModule],
                 inject: [config_1.ConfigService],
-                useFactory: (config) => ({
-                    type: 'postgres',
-                    host: config.get('DATABASE_HOST', 'localhost'),
-                    port: Number(config.get('DATABASE_PORT', 5432)),
-                    username: config.get('DATABASE_USER', 'postgres'),
-                    password: config.get('DATABASE_PASSWORD', 'postgres'),
-                    database: config.get('DATABASE_NAME', 'todo_db'),
-                    entities: [todo_entity_1.Todo],
-                    synchronize: true,
-                    logging: config.get('NODE_ENV') === 'development',
-                }),
+                useFactory: (config) => {
+                    const databaseUrl = config.get('DATABASE_URL');
+                    const sslConfig = config.get('DATABASE_SSL');
+                    let ssl = undefined;
+                    if (sslConfig === 'true') {
+                        ssl = { rejectUnauthorized: false };
+                    }
+                    else if (sslConfig === 'false') {
+                        ssl = false;
+                    }
+                    else if (databaseUrl && (databaseUrl.includes('render.com') || databaseUrl.includes('sslmode=require'))) {
+                        ssl = { rejectUnauthorized: false };
+                    }
+                    const maskedUrl = databaseUrl ? databaseUrl.replace(/:[^:@]+@/, ':***@') : null;
+                    console.log(`[TypeORM] Connecting to database: ${maskedUrl ? `URL: ${maskedUrl}` : `Host: ${config.get('DATABASE_HOST', 'localhost')}:${config.get('DATABASE_PORT', 5432)}`}`);
+                    return {
+                        type: 'postgres',
+                        ...(databaseUrl
+                            ? { url: databaseUrl }
+                            : {
+                                host: config.get('DATABASE_HOST', 'localhost'),
+                                port: Number(config.get('DATABASE_PORT', 5432)),
+                                username: config.get('DATABASE_USER', 'postgres'),
+                                password: config.get('DATABASE_PASSWORD', 'postgres'),
+                                database: config.get('DATABASE_NAME', 'todo_db'),
+                            }),
+                        entities: [todo_entity_1.Todo],
+                        synchronize: true,
+                        ssl,
+                        logging: config.get('NODE_ENV') === 'development',
+                    };
+                },
             }),
             todo_module_1.TodoModule,
         ],
